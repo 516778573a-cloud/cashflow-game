@@ -1,0 +1,16 @@
+{
+  "name": "富爸爸现金流 · 3D大富翁",
+  "short_name": "现金流大富翁",
+  "description": "掷骰买资产，让被动收入超过总支出，跳出老鼠赛跑！",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e1a",
+  "theme_color": "#0b0e1a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>富爸爸现金流 · 3D大富翁</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b0e1a;
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:#eef1f8; }
+  #scene { position:fixed; inset:0; }
+  #scene canvas { display:block; touch-action:none; }
+
+  /* ---- 财务报表面板 ---- */
+  #panel { position:fixed; top:calc(10px + env(safe-area-inset-top)); left:10px; width:212px;
+    background:rgba(16,20,38,.82); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.12);
+    border-radius:14px; padding:12px 14px; font-size:12px; z-index:5; }
+  #panel h3 { font-size:13px; color:#ffd666; letter-spacing:1px; margin-bottom:6px; }
+  #panel .row { display:flex; justify-content:space-between; padding:2px 0; color:#c7cede; }
+  #panel .row b { color:#fff; font-weight:600; }
+  #panel .row.pos b { color:#5ee08a; }
+  #panel .row.neg b { color:#ff7b7b; }
+  #panel .divider { border-top:1px dashed rgba(255,255,255,.15); margin:6px 0; }
+  #progressWrap { margin-top:6px; }
+  #progressWrap .lbl { font-size:11px; color:#9aa4bd; margin-bottom:3px; }
+  #progressBar { height:8px; border-radius:4px; background:rgba(255,255,255,.1); overflow:hidden; }
+  #progressBar i { display:block; height:100%; width:0%;
+    background:linear-gradient(90deg,#ffb84d,#5ee08a); border-radius:4px; transition:width .5s; }
+  #assetsBox { margin-top:6px; max-height:88px; overflow-y:auto; font-size:11px; color:#9aa4bd; }
+  #assetsBox div { padding:1px 0; }
+
+  /* ---- 消息日志 ---- */
+  #log { position:fixed; left:10px; bottom:calc(86px + env(safe-area-inset-bottom)); width:212px;
+    font-size:11px; color:#aab3c8; z-index:5; pointer-events:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.8); }
+  #log div { margin-top:3px; opacity:.9; }
+
+  /* ---- 底部操作区 ---- */
+  #controls { position:fixed; bottom:calc(14px + env(safe-area-inset-bottom)); left:0; right:0;
+    display:flex; justify-content:center; align-items:center; gap:10px; z-index:6; }
+  #btnRoll { width:132px; height:56px; border:none; border-radius:28px; font-size:19px; font-weight:700;
+    color:#1a1205; background:linear-gradient(180deg,#ffe08a,#ffb63d);
+    box-shadow:0 6px 18px rgba(255,182,61,.45), inset 0 1px 0 rgba(255,255,255,.6); }
+  #btnRoll:active { transform:scale(.95); }
+  #btnRoll:disabled { filter:grayscale(.7); opacity:.6; }
+  .miniBtn { height:40px; padding:0 14px; border-radius:20px; border:1px solid rgba(255,255,255,.25);
+    background:rgba(20,26,48,.85); color:#cfd6ea; font-size:13px; }
+  .miniBtn:active { transform:scale(.94); }
+
+  /* ---- 弹窗卡片 ---- */
+  #modalMask { position:fixed; inset:0; background:rgba(4,6,14,.6); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:20; padding:20px; }
+  #modalMask.show { display:flex; }
+  #card { width:100%; max-width:340px; background:linear-gradient(165deg,#232a4a,#151a30);
+    border:1px solid rgba(255,214,102,.35); border-radius:18px; padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6); animation:pop .25s ease; }
+  @keyframes pop { from { transform:scale(.85); opacity:0; } }
+  #cardTag { display:inline-block; font-size:11px; padding:3px 10px; border-radius:10px;
+    background:rgba(255,214,102,.15); color:#ffd666; margin-bottom:8px; }
+  #cardTitle { font-size:19px; font-weight:700; margin-bottom:8px; }
+  #cardBody { font-size:14px; line-height:1.7; color:#cfd6ea; margin-bottom:16px; }
+  #cardBody b { color:#ffd666; }
+  #cardBtns { display:flex; flex-direction:column; gap:8px; }
+  .cardBtn { height:44px; border:none; border-radius:12px; font-size:15px; font-weight:600;
+    background:rgba(255,255,255,.08); color:#e6ebf7; border:1px solid rgba(255,255,255,.15); }
+  .cardBtn.primary { background:linear-gradient(180deg,#5ee08a,#2fae5f); color:#07130b; border:none; }
+  .cardBtn:disabled { opacity:.35; }
+  .cardBtn:active { transform:scale(.97); }
+
+  /* ---- 联机大厅 & 回合提示 ---- */
+  #lobby { display:none; flex-direction:column; gap:10px; width:100%; max-width:330px; }
+  #lobby .cardBtn { width:100%; }
+  #joinRow { display:flex; gap:8px; }
+  #roomInput { flex:1; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.07); color:#ffd666; font-size:18px; text-align:center;
+    letter-spacing:6px; outline:none; }
+  #roomCodeShow { text-align:center; font-size:30px; font-weight:700; color:#ffd666;
+    letter-spacing:8px; margin:4px 0; }
+  #playerList { font-size:13px; color:#9aa4bd; line-height:1.9; text-align:center; }
+  #turnLbl { position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:0; right:0;
+    text-align:center; font-size:14px; color:#ffd666; z-index:6; pointer-events:none;
+    text-shadow:0 1px 4px rgba(0,0,0,.8); display:none; }
+  #mpList { margin-top:6px; border-top:1px dashed rgba(255,255,255,.15); padding-top:4px;
+    font-size:11px; color:#9aa4bd; }
+
+  /* ---- 静音按钮 ---- */
+  #btnMute { position:fixed; top:calc(10px + env(safe-area-inset-top)); right:10px; z-index:8;
+    width:42px; height:42px; border-radius:50%; border:1px solid rgba(255,255,255,.25);
+    background:rgba(20,26,48,.85); color:#fff; font-size:18px; display:none; }
+  #btnMute:active { transform:scale(.92); }
+
+  /* ---- 开局选角色 ---- */
+  #startMask { position:fixed; inset:0; z-index:30; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; padding:24px;
+    background:radial-gradient(ellipse at 50% 30%, #1c2342 0%, #0b0e1a 70%); }
+  #startMask h1 { font-size:26px; color:#ffd666; letter-spacing:2px; }
+  #startMask .sub { font-size:13px; color:#9aa4bd; margin-bottom:8px; }
+  .roleCard { width:100%; max-width:330px; text-align:left; border-radius:16px; padding:16px 18px;
+    border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#eef1f8;
+    font-size:13px; line-height:1.8; }
+  .roleCard b.t { font-size:17px; display:block; margin-bottom:2px; }
+  .roleCard.poor b.t { color:#7db8ff; }
+  .roleCard.rich b.t { color:#ffd666; }
+  .roleCard:active { transform:scale(.97); background:rgba(255,255,255,.1); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="panel" style="display:none">
+  <h3 id="pTitle">现金流报表</h3>
+  <div class="row"><span>现金</span><b id="pCash">0</b></div>
+  <div class="divider"></div>
+  <div class="row"><span>工资收入</span><b id="pSalary">0</b></div>
+  <div class="row pos"><span>被动收入</span><b id="pPassive">0</b></div>
+  <div class="row neg"><span>总支出</span><b id="pExpense">0</b></div>
+  <div class="divider"></div>
+  <div class="row"><span>月现金流</span><b id="pCashflow">0</b></div>
+  <div id="progressWrap">
+    <div class="lbl" id="pGoalLbl">财务自由进度 0%</div>
+    <div id="progressBar"><i id="pGoal"></i></div>
+  </div>
+  <div id="assetsBox"></div>
+  <div id="mpList" style="display:none"></div>
+</div>
+
+<div id="log"></div>
+<div id="turnLbl"></div>
+<button id="btnMute">🔊</button>
+
+<div id="controls" style="display:none">
+  <button class="miniBtn" id="btnLoan">贷款</button>
+  <button id="btnRoll">🎲 掷骰子</button>
+  <button class="miniBtn" id="btnRepay">还贷</button>
+</div>
+
+<div id="modalMask"><div id="card">
+  <span id="cardTag"></span>
+  <div id="cardTitle"></div>
+  <div id="cardBody"></div>
+  <div id="cardBtns"></div>
+</div></div>
+
+<div id="startMask">
+  <h1>富爸爸现金流</h1>
+  <div class="sub">掷骰买资产，让被动收入超过总支出，跳出老鼠赛跑！</div>
+  <button class="roleCard poor" data-mode="poor">
+    <b class="t">👔 穷爸爸 · 工薪族</b>
+    工资 3500 / 支出 2600 / 现金 800<br>收入高但存不下钱，稳健起步
+  </button>
+  <button class="roleCard rich" data-mode="rich">
+    <b class="t">💼 富爸爸 · 投资者</b>
+    工资 2200 / 支出 1800 / 现金 2500<br>自带一只货币基金（月分红 +60）
+  </button>
+  <div id="lobby">
+    <div class="sub" id="lobbyMsg" style="text-align:center">选择开始方式</div>
+    <button class="cardBtn primary" id="btnSolo">🎮 单人开局</button>
+    <button class="cardBtn" id="btnCreate">📡 创建房间（我做房主）</button>
+    <div id="joinRow">
+      <input id="roomInput" maxlength="4" inputmode="numeric" placeholder="房间号">
+      <button class="cardBtn" id="btnJoin" style="width:96px">加入房间</button>
+    </div>
+    <div id="roomCodeShow"></div>
+    <div id="playerList"></div>
+    <button class="cardBtn primary" id="btnMpStart" style="display:none">🚀 开始游戏（房主专属）</button>
+  </div>
+</div>
+<script>
+/* ============================================================
+ * 富爸爸现金流 · 3D大富翁  单人Demo v1
+ * 核心数据结构 + Three.js 3D场景 + 现金流玩法
+ * ============================================================ */
+
+/* ---------- 1. 核心数据 ---------- */
+const TILE_TYPES = [
+  'payday','chance','doodad','market','chance','charity',
+  'payday','chance','doodad','chance','market','baby',
+  'payday','chance','doodad','market','chance','chance',
+  'payday','doodad','chance','market','doodad','fired'
+];
+const TILE_INFO = {
+  payday : { label:'发工资', color:0x27ae60 },
+  chance : { label:'机会',   color:0x2e86de },
+  doodad : { label:'支出',   color:0xe67e22 },
+  market : { label:'市场',   color:0x8e44ad },
+  charity: { label:'慈善',   color:0xd4ac0d },
+  baby   : { label:'宝宝',   color:0xe84393 },
+  fired  : { label:'失业',   color:0x5d6d7e }
+};
+
+const G = {           // 玩家财务状态（核心数据结构）
+  mode:null, cash:0, salary:0, baseExp:0, babyExp:0,
+  loans:0, assets:[], pos:0, shield:false, busy:false, over:false,
+  fast:false, fpos:0          // fast=true 表示已进入快车道
+};
+const passive  = () => G.assets.reduce((s,a)=> s + (a.cashflow||0), 0);
+const expenses = () => G.baseExp + G.babyExp + G.loans*100;   // 贷款每1000元月还100
+const cashflow = () => G.salary + passive() - expenses();
+
+/* ---------- 2. 卡牌牌库 ---------- */
+const CHANCE_DECK = [
+  {kind:'stock', name:'蔚蓝科技股票 10股',  cost:300,  price:30, shares:10, desc:'有上涨空间，暂无分红。'},
+  {kind:'stock', name:'绿能电力股票 20股',  cost:900,  price:45, shares:20, desc:'新能源热门股，暂无分红。'},
+  {kind:'fund',  name:'稳利货币基金',       cost:2000, cashflow:35,  desc:'低风险，每月分红 +35。'},
+  {kind:'re',    name:'两室一厅老公寓',     cost:3000, price:55000, cashflow:180, desc:'首付3000，月租金净收入 +180。'},
+  {kind:'re',    name:'合租公寓单间',       cost:1500, price:30000, cashflow:110, desc:'首付1500，月净收入 +110。'},
+  {kind:'re',    name:'临街小商铺',         cost:8000, price:120000,cashflow:500, desc:'首付8000，月净租金 +500。'},
+  {kind:'biz',   name:'自动售货机 ×2',      cost:1500, cashflow:120, desc:'一次投入，月净收入 +120。'},
+  {kind:'biz',   name:'网络小说版权',       cost:2000, cashflow:150, desc:'买断版权，月版税 +150。'},
+  {kind:'biz',   name:'小型自助仓储',       cost:6000, cashflow:380, desc:'投入6000，月净收入 +380。'},
+  {kind:'biz',   name:'在线知识小课',       cost:1200, cashflow:90,  desc:'录一次课，月分成 +90。'}
+];
+const DOODADS = [
+  ['换了台新手机',800],['朋友婚礼随份子',300],['汽车大保养',450],
+  ['冲动下单限量版球鞋',260],['宠物生病看医生',380],['报了个兴趣班',600],
+  ['说走就走的旅行',900],['家里冰箱坏了',350],['健身房年卡',500]
+];
+
+/* ---------- 3. 3D 场景 ---------- */
+let scene, camera, renderer, controls, piece, dice, pieceColor = 0xffd166;
+const TILE = 2, STEP = 2.25, HALF = 3*STEP;   // 每边7格(含角)，共24格
+const tilePos = [];
+
+for (let i=0;i<24;i++){
+  let x, z;
+  if (i<=6)       { x = HALF - i*STEP;        z = HALF;  }
+  else if (i<=12) { x = -HALF;                z = HALF - (i-6)*STEP;  }
+  else if (i<=18) { x = -HALF + (i-12)*STEP;  z = -HALF; }
+  else            { x = HALF;                 z = -HALF + (i-18)*STEP;}
+  tilePos.push(new THREE.Vector3(x, 0.55, z));
+}
+
+// 快车道外圈格子定义（24格，更大间距）
+const FAST_TYPES = [
+  'payday2','bigdeal','dream','risk','bigdeal','charity2',
+  'payday2','bigdeal','tax','bigdeal','dream','risk',
+  'payday2','bigdeal','dream','tax','bigdeal','bigdeal',
+  'payday2','risk','bigdeal','tax','bigdeal','dream'
+];
+const FAST_INFO = {
+  payday2 : { label:'结算日', color:0x16a085 },
+  bigdeal : { label:'大买卖', color:0xf39c12 },
+  dream   : { label:'梦想',   color:0xfd79a8 },
+  risk    : { label:'风险',   color:0xd63031 },
+  tax     : { label:'税务',   color:0x636e72 },
+  charity2: { label:'慈善',   color:0xd4ac0d }
+};
+const BIGDEALS = [
+  { name:'连锁奶茶店股份', cost:15000, cashflow:1200 },
+  { name:'品牌加盟权',     cost:20000, cashflow:1800 },
+  { name:'商业综合体铺位', cost:28000, cashflow:2400 },
+  { name:'软件公司股权',   cost:35000, cashflow:3000 },
+  { name:'物流仓库群',     cost:42000, cashflow:3600 },
+  { name:'写字楼整层',     cost:50000, cashflow:4500 }
+];
+const DREAM_COST = 100000, FAST_GOAL = 150000;
+const OTILE = 1.8, OSTEP = 3.3, OHALF = 3*OSTEP;
+const outPos = [];
+for (let i=0;i<24;i++){
+  let x, z;
+  if (i<=6)       { x = OHALF - i*OSTEP;       z = OHALF;  }
+  else if (i<=12) { x = -OHALF;                z = OHALF - (i-6)*OSTEP;  }
+  else if (i<=18) { x = -OHALF + (i-12)*OSTEP; z = -OHALF; }
+  else            { x = OHALF;                 z = -OHALF + (i-18)*OSTEP;}
+  outPos.push(new THREE.Vector3(x, 0.5, z));
+}
+
+function tileTexture(label, colorHex){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#'+colorHex.toString(16).padStart(6,'0');
+  g.fillRect(0,0,256,256);
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 10;
+  g.strokeRect(8,8,240,240);
+  g.fillStyle = '#fff'; g.font = 'bold 72px "PingFang SC","Microsoft YaHei",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(label, 128, 132);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+
+function logoTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const g = c.getContext('2d');
+  g.fillStyle = '#141a30'; g.fillRect(0,0,1024,1024);
+  g.strokeStyle = 'rgba(255,214,102,.9)'; g.lineWidth = 14;
+  g.beginPath(); g.arc(512,512,430,0,Math.PI*2); g.stroke();
+  g.strokeStyle = 'rgba(255,214,102,.35)'; g.lineWidth = 5;
+  g.beginPath(); g.arc(512,512,392,0,Math.PI*2); g.stroke();
+  g.fillStyle = '#ffd666'; g.textAlign='center';
+  g.font = 'bold 150px "PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('现金流', 512, 480);
+  g.font = 'bold 74px Arial'; g.fillStyle = '#e8c25e';
+  g.fillText('C A S H F L O W', 512, 590);
+  g.font = '44px "PingFang SC","Microsoft YaHei",sans-serif'; g.fillStyle = '#9aa4bd';
+  g.fillText('被 动 收 入 ＞ 总 支 出', 512, 690);
+  return new THREE.CanvasTexture(c);
+}
+
+function diceFaceTexture(n){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f7f7f7'; g.fillRect(0,0,128,128);
+  g.fillStyle = '#1a1a1a';
+  const p = [[38,38],[90,38],[38,90],[90,90],[64,64],[38,64],[90,64],[64,38],[64,90]];
+  const map = {1:[4], 2:[0,3], 3:[0,4,3], 4:[0,1,2,3], 5:[0,1,2,3,4], 6:[0,1,2,3,5,6]};
+  map[n].forEach(i=>{ g.beginPath(); g.arc(p[i][0],p[i][1],13,0,Math.PI*2); g.fill(); });
+  return new THREE.CanvasTexture(c);
+}
+const DICE_UP_ROT = {   // 让点数 v 朝上的欧拉角（材质顺序 +x,-x,+y,-y,+z,-z 对应 1..6）
+  1:[0,0,Math.PI/2], 2:[0,0,-Math.PI/2], 3:[0,0,0],
+  4:[Math.PI,0,0], 5:[-Math.PI/2,0,0], 6:[Math.PI/2,0,0]
+};
+
+function makePiece(colorHex){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:colorHex, roughness:0.35, metalness:0.25 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 0.85, 24), mat);
+  body.position.y = 0.43;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 24, 18), mat);
+  head.position.y = 1.08;
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.12, 24),
+    new THREE.MeshStandardMaterial({ color:0x222833, roughness:0.6 }));
+  foot.position.y = 0.06;
+  g.add(body, head, foot);
+  g.traverse(o=>{ o.castShadow = true; });
+  g.userData.recolor = c => { body.material.color.set(c); head.material.color.set(c); };
+  return g;
+}
+
+function initScene(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b0e1a);
+  scene.fog = new THREE.Fog(0x0b0e1a, 40, 90);
+
+  camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 120);
+  function fitCamera(){
+    const a = innerWidth/innerHeight;
+    camera.aspect = a;
+    if (a < 0.75){      // 竖屏手机：拉远 + 扩大视场（容纳快车道外圈）
+      camera.fov = 60; camera.position.set(0, 26.5, 29);
+    } else if (a < 1){
+      camera.fov = 52; camera.position.set(0, 20.5, 22.5);
+    } else {
+      camera.fov = 46; camera.position.set(0, 16, 18);
+    }
+    camera.updateProjectionMatrix();
+  }
+  fitCamera();
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('scene').appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI/2.25; controls.minDistance = 9; controls.maxDistance = 55;
+  controls.enablePan = false;
+
+  scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1a1408, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff2d9, 1.0);
+  sun.position.set(10, 18, 8); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -14;
+  sun.shadow.camera.right = sun.shadow.camera.top = 14;
+  scene.add(sun);
+
+  // 地面 + 底座
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(34, 48),
+    new THREE.MeshStandardMaterial({ color:0x10141f, roughness:1 }));
+  ground.rotation.x = -Math.PI/2; ground.position.y = -0.62; ground.receiveShadow = true;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(60, 40, 0x1d2438, 0x161c2e));
+  scene.children[scene.children.length-1].position.y = -0.6;
+
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(16.8, 0.5, 16.8),
+    new THREE.MeshStandardMaterial({ color:0x1d2540, roughness:0.7 }));
+  base.position.y = -0.28; base.receiveShadow = true; base.castShadow = true;
+  scene.add(base);
+
+  // 快车道外圈底座 + 24 格
+  const obase = new THREE.Mesh(
+    new THREE.BoxGeometry(22.8, 0.35, 22.8),
+    new THREE.MeshStandardMaterial({ color:0x161d33, roughness:0.85 }));
+  obase.position.y = -0.45; obase.receiveShadow = true;
+  scene.add(obase);
+  FAST_TYPES.forEach((t, i)=>{
+    const info = FAST_INFO[t];
+    const side = new THREE.MeshStandardMaterial({ color:0x232c4a, roughness:0.8 });
+    const top  = new THREE.MeshStandardMaterial({ map:tileTexture(info.label, info.color), roughness:0.6 });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(OTILE, 0.45, OTILE),
+      [side, side, top, side, side, side]);
+    m.position.set(outPos[i].x, 0.22, outPos[i].z);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  });
+
+  // 中心 LOGO
+  const logo = new THREE.Mesh(
+    new THREE.PlaneGeometry(9.6, 9.6),
+    new THREE.MeshStandardMaterial({ map:logoTexture(), roughness:0.85 }));
+  logo.rotation.x = -Math.PI/2; logo.position.y = -0.02; logo.receiveShadow = true;
+  scene.add(logo);
+
+  // 24 个格子
+  TILE_TYPES.forEach((t, i)=>{
+    const info = TILE_INFO[t];
+    const side = new THREE.MeshStandardMaterial({ color:0x2a3355, roughness:0.8 });
+    const top  = new THREE.MeshStandardMaterial({ map:tileTexture(info.label, info.color), roughness:0.6 });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(TILE, 0.55, TILE),
+      [side, side, top, side, side, side]);
+    m.position.set(tilePos[i].x, 0.27, tilePos[i].z);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  });
+
+  // 玩家棋子（联机时每个玩家一枚）
+  piece = makePiece(pieceColor);
+  piece.position.copy(tilePos[0]);
+  scene.add(piece);
+
+  // 3D 骰子
+  dice = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.9, 0.9),
+    [1,2,3,4,5,6].map(n => new THREE.MeshStandardMaterial({ map:diceFaceTexture(n), roughness:0.3 })));
+  dice.position.set(0, 2.6, 0); dice.castShadow = true;
+  dice.rotation.set(0.5, 0.6, 0.3);
+  scene.add(dice);
+
+  addEventListener('resize', ()=>{
+    fitCamera();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  if (new URLSearchParams(location.search).has('lite')){
+    // 低负载模式（自动化测试用）：限帧渲染
+    setInterval(()=> renderer.render(scene, camera), 400);
+  } else {
+    (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+  }
+}
+initScene();
+</script>
+<script>
+/* ---------- 4. 音效引擎（Web Audio 实时合成，零音频文件） ---------- */
+const SFX = (()=>{
+  let ctx = null, muted = false;
+  function ac(){
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function env(g, t0, vol, dur){
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  }
+  function tone(f0, f1, dur, type, vol, delay){
+    if (muted) return;
+    const c = ac(), t0 = c.currentTime + (delay||0);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    env(g, t0, vol, dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function noise(dur, vol, freq, delay){
+    if (muted) return;
+    const c = ac(), t0 = c.currentTime + (delay||0);
+    const len = Math.max(1, (c.sampleRate * dur) | 0);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random()*2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.9;
+    const g = c.createGain(); env(g, t0, vol, dur);
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start(t0);
+  }
+  const lib = {
+    click(){ tone(700, 950, 0.07, 'triangle', 0.14); },
+    dice(){ for (let i = 0; i < 6; i++) noise(0.05, 0.22, 1600 + Math.random()*1400, i*0.13);
+            noise(0.16, 0.32, 850, 0.82); },
+    hop(){ tone(480, 780, 0.12, 'sine', 0.16); },
+    coin(){ tone(990, 990, 0.08, 'square', 0.1); tone(1320, 1320, 0.18, 'square', 0.1, 0.08); },
+    cash(){ [660, 880, 1100, 1320].forEach((f,i)=> tone(f, f, 0.13, 'triangle', 0.15, i*0.07)); },
+    card(){ noise(0.16, 0.18, 3200); tone(280, 620, 0.14, 'sine', 0.07, 0.02); },
+    bad(){ tone(420, 170, 0.38, 'sawtooth', 0.1); },
+    baby(){ tone(880, 1175, 0.14, 'sine', 0.14); tone(1175, 880, 0.2, 'sine', 0.14, 0.16); },
+    win(){ [523, 659, 784, 1047, 1319, 1568].forEach((f,i)=> tone(f, f, 0.28, 'triangle', 0.18, i*0.12)); },
+    lose(){ [392, 330, 262, 196].forEach((f,i)=> tone(f, f, 0.32, 'triangle', 0.14, i*0.18)); }
+  };
+  return {
+    play(n){ try { lib[n] && lib[n](); } catch(e){} },
+    unlock(){ try { ac(); } catch(e){} },
+    toggle(){ muted = !muted; return muted; }
+  };
+})();
+
+/* ---------- 5. UI 工具 ---------- */
+const $ = id => document.getElementById(id);
+const fmt = n => (n<0?'-':'') + Math.abs(Math.round(n)).toLocaleString();
+
+let turnLog = null;   // 联机时收集本回合日志，结算后广播给其他玩家
+function log(msg){
+  const box = $('log');
+  const d = document.createElement('div'); d.textContent = msg;
+  box.prepend(d);
+  while (box.children.length > 5) box.lastChild.remove();
+  if (turnLog) turnLog.push(msg);
+}
+
+function showCard({ tag, title, body, buttons }){
+  return new Promise(resolve=>{
+    $('cardTag').textContent = tag;
+    $('cardTitle').textContent = title;
+    $('cardBody').innerHTML = body;
+    const wrap = $('cardBtns'); wrap.innerHTML = '';
+    buttons.forEach(b=>{
+      const btn = document.createElement('button');
+      btn.className = 'cardBtn' + (b.primary ? ' primary' : '');
+      btn.textContent = b.label;
+      if (b.disabled) btn.disabled = true;
+      btn.onclick = ()=>{ $('modalMask').classList.remove('show'); resolve(b.value); };
+      wrap.appendChild(btn);
+    });
+    $('modalMask').classList.add('show');
+  });
+}
+
+function updateUI(){
+  $('pCash').textContent = fmt(G.cash);
+  $('pSalary').textContent = fmt(G.salary);
+  $('pPassive').textContent = '+' + fmt(passive());
+  $('pExpense').textContent = '-' + fmt(expenses());
+  const cf = cashflow();
+  $('pCashflow').textContent = fmt(cf);
+  $('pCashflow').parentElement.className = 'row ' + (cf>=0 ? 'pos' : 'neg');
+  let pct;
+  if (G.fast){
+    pct = Math.min(100, Math.round(G.cash / FAST_GOAL * 100));
+    $('pGoalLbl').textContent = '梦想基金进度 ' + pct + '%（目标 ' + fmt(FAST_GOAL) + '）';
+  } else {
+    pct = Math.min(100, Math.round(passive()/expenses()*100));
+    $('pGoalLbl').textContent = '财务自由进度 ' + pct + '%';
+  }
+  $('pGoal').style.width = pct + '%';
+  const box = $('assetsBox');
+  box.innerHTML = G.assets.length
+    ? G.assets.map(a=>`<div>· ${a.name}${a.cashflow?`（+${a.cashflow}/月）`:''}</div>`).join('')
+    : '<div>（暂无资产，去"机会"格看看）</div>';
+}
+
+/* ---------- 5. 动画 ---------- */
+function tween(dur, fn){
+  return new Promise(res=>{
+    const t0 = performance.now();
+    let done = false;
+    const finish = ()=>{ if (!done){ done = true; fn(1); res(); } };
+    setTimeout(finish, dur + 150);   // rAF 停摆时的兜底
+    (function f(now){
+      if (done) return;
+      const k = Math.min(1, (now-t0)/dur);
+      fn(k);
+      k < 1 ? requestAnimationFrame(f) : finish();
+    })(t0);
+  });
+}
+const easeOut = k => 1 - Math.pow(1-k, 3);
+
+async function rollDice(preset){
+  const v = preset || (1 + Math.floor(Math.random()*6));
+  SFX.play('dice');
+  const [tx,ty,tz] = DICE_UP_ROT[v];
+  const sx = dice.rotation.x, sy = dice.rotation.y, sz = dice.rotation.z;
+  const spin = Math.PI*2*3;
+  await tween(900, k=>{
+    const e = easeOut(k);
+    dice.rotation.x = sx + (tx + spin - sx)*e;
+    dice.rotation.y = sy + (ty + spin - sy)*e;
+    dice.rotation.z = sz + (tz + spin*0.5 - sz)*e;
+    dice.position.y = 2.6 + Math.sin(k*Math.PI)*1.4;
+  });
+  return v;
+}
+
+async function moveSteps(n){
+  const off = (typeof MP !== 'undefined' && MP.inGame) ? MP.offset(MP.myId) : new THREE.Vector3();
+  for (let s=0; s<n; s++){
+    if (G.fast) G.fpos = (G.fpos+1) % 24; else G.pos = (G.pos+1) % 24;
+    SFX.play('hop');
+    const target = (G.fast ? outPos[G.fpos] : tilePos[G.pos]).clone().add(off);
+    const from = piece.position.clone();
+    await tween(240, k=>{
+      piece.position.lerpVectors(from, target, k);
+      piece.position.y = from.y + (target.y-from.y)*k + Math.sin(k*Math.PI)*0.9;
+    });
+  }
+  if (typeof MP !== 'undefined' && MP.inGame) MP.pos[MP.myId] = G.fast ? G.fpos : G.pos;
+}
+
+/* ---------- 6. 格子结算 ---------- */
+async function resolveTile(){
+  if (G.fast) return resolveFastTile();
+  const t = TILE_TYPES[G.pos];
+
+  if (t === 'payday'){
+    const cf = cashflow();
+    G.cash += cf;
+    SFX.play('cash');
+    await showCard({ tag:'发工资日', title:'月度结算',
+      body:`工资 ${fmt(G.salary)} + 被动收入 ${fmt(passive())} − 总支出 ${fmt(expenses())}<br>＝ <b>${fmt(cf)} 元</b> 已入账`,
+      buttons:[{ label:'收下', value:1, primary:true }] });
+    log('💰 结算 ' + fmt(cf) + ' 元');
+  }
+
+  else if (t === 'chance'){
+    const c = CHANCE_DECK[Math.floor(Math.random()*CHANCE_DECK.length)];
+    SFX.play('card');
+    const can = G.cash >= c.cost;
+    const buy = await showCard({ tag:'机会卡', title:c.name,
+      body:`${c.desc}<br>需要现金：<b>${fmt(c.cost)} 元</b>`,
+      buttons:[
+        { label: can ? `买入（-${fmt(c.cost)}）` : '现金不足，无法买入', value:1, primary:true, disabled:!can },
+        { label:'放弃机会', value:0 }
+      ]});
+    if (buy){
+      G.cash -= c.cost;
+      SFX.play('coin');
+      G.assets.push({ kind:c.kind, name:c.name, shares:c.shares||0,
+        buyPrice:c.price||0, price:c.price||0, cashflow:c.cashflow||0 });
+      log('🤝 买入 ' + c.name);
+    } else log('🚶 放弃了机会');
+  }
+
+  else if (t === 'doodad'){
+    const [name, amt] = DOODADS[Math.floor(Math.random()*DOODADS.length)];
+    if (G.shield){
+      G.shield = false;
+      SFX.play('coin');
+      await showCard({ tag:'额外支出', title:name,
+        body:`本该花费 <b>${fmt(amt)} 元</b>，但慈善好运卡为你免单了！`,
+        buttons:[{ label:'太幸运了', value:1, primary:true }] });
+      log('🍀 慈善卡免单一次支出');
+    } else {
+      G.cash -= amt;
+      SFX.play('bad');
+      await showCard({ tag:'额外支出', title:name,
+        body:`一时没忍住……花费 <b>${fmt(amt)} 元</b>`,
+        buttons:[{ label:'心疼地付款', value:1, primary:true }] });
+      log('💸 支出 ' + fmt(amt) + ' 元');
+    }
+  }
+
+  else if (t === 'market'){
+    const sellables = G.assets.filter(a=>a.kind==='stock' || a.kind==='re');
+    if (!sellables.length){
+      await showCard({ tag:'市场行情', title:'市场冷清',
+        body:'你名下没有可出售的资产，暂无交易机会。',
+        buttons:[{ label:'离开', value:0, primary:true }] });
+    } else {
+      const offers = sellables.map(a=>{
+        if (a.kind === 'stock'){
+          const np = Math.max(5, Math.round(a.buyPrice * (0.6 + Math.random()*1.6)));
+          return { a, desc:`${a.name} · 市价涨至 ${np}/股，全部卖出可得 ${fmt(np*a.shares)} 元`, gain: np*a.shares };
+        }
+        const m = 1.15 + Math.random()*0.5;
+        const amt = Math.round(a.price*m);
+        return { a, desc:`买家求购「${a.name}」，出价 ${fmt(amt)} 元（将失去 +${a.cashflow}/月）`, gain: amt };
+      });
+      const pick = await showCard({ tag:'市场行情', title:'有人出价了！',
+        body:'选择一笔成交，或继续持有：',
+        buttons:[
+          ...offers.map((o,i)=>({ label:o.desc, value:i+1 })),
+          { label:'都不卖，继续持有', value:0, primary:true }
+        ]});
+      if (pick > 0){
+        const o = offers[pick-1];
+        G.cash += o.gain;
+        SFX.play('cash');
+        G.assets.splice(G.assets.indexOf(o.a), 1);
+        log('📈 卖出资产 +' + fmt(o.gain) + ' 元');
+      } else log('📉 没有交易');
+    }
+  }
+
+  else if (t === 'charity'){
+    if (G.cash >= 200){
+      G.cash -= 200; G.shield = true;
+      SFX.play('coin');
+      await showCard({ tag:'慈善', title:'献出一份爱心',
+        body:'捐赠 <b>200 元</b>。好心有好报：获得一张好运卡，<b>免除下一次"支出"格的开销</b>。',
+        buttons:[{ label:'乐意捐赠', value:1, primary:true }] });
+      log('❤️ 捐款 200，获得免单卡');
+    } else {
+      await showCard({ tag:'慈善', title:'心有余而力不足',
+        body:'现金不足 200 元，这次先不捐了。',
+        buttons:[{ label:'下次一定', value:0, primary:true }] });
+    }
+  }
+
+  else if (t === 'baby'){
+    G.babyExp += 280;
+    SFX.play('baby');
+    await showCard({ tag:'人生大事', title:'宝宝出生啦！👶',
+      body:'可喜可贺！从本月起总支出 <b>+280/月</b>（奶粉钱可省不了）',
+      buttons:[{ label:'痛并快乐着', value:1, primary:true }] });
+    log('👶 支出 +280/月');
+  }
+
+  else if (t === 'fired'){
+    const cost = expenses();
+    G.cash -= cost;
+    SFX.play('bad');
+    await showCard({ tag:'坏消息', title:'被裁员了……',
+      body:`待业一个月，自掏腰包支付本月全部支出 <b>${fmt(cost)} 元</b>。<br>这就是只有工资收入的风险！`,
+      buttons:[{ label:'振作起来', value:1, primary:true }] });
+    log('😱 失业，支付 ' + fmt(cost) + ' 元');
+  }
+}
+
+/* ---------- 6.5 快车道格子结算 ---------- */
+async function resolveFastTile(){
+  const t = FAST_TYPES[G.fpos];
+  if (t === 'payday2'){
+    const amt = passive() * 50;
+    G.cash += amt;
+    SFX.play('cash');
+    await showCard({ tag:'快车道 · 结算日', title:'大额结算',
+      body:`被动收入 ${fmt(passive())}/月 × 50 ＝ <b>${fmt(amt)} 元</b>！<br>快车道上，钱来得就是快。`,
+      buttons:[{ label:'收下', value:1, primary:true }] });
+    log('💰 快车道结算 +' + fmt(amt));
+  }
+  else if (t === 'bigdeal'){
+    const c = BIGDEALS[Math.floor(Math.random()*BIGDEALS.length)];
+    SFX.play('card');
+    const can = G.cash >= c.cost;
+    const buy = await showCard({ tag:'快车道 · 大买卖', title:c.name,
+      body:`投入 <b>${fmt(c.cost)} 元</b>，每月新增被动收入 <b>+${fmt(c.cashflow)}</b>。<br>被动收入越高，结算日领得越多！`,
+      buttons:[
+        { label: can ? `买入（-${fmt(c.cost)}）` : '现金不足', value:1, primary:true, disabled:!can },
+        { label:'再看看', value:0 }
+      ]});
+    if (buy){
+      G.cash -= c.cost;
+      SFX.play('coin');
+      G.assets.push({ kind:'biz', name:c.name, cashflow:c.cashflow, shares:0, buyPrice:0, price:0 });
+      log('🤝 大买卖：' + c.name);
+    }
+  }
+  else if (t === 'dream'){
+    SFX.play('card');
+    if (G.cash >= DREAM_COST){
+      const buy = await showCard({ tag:'快车道 · 梦想', title:'梦想就在眼前！🏝️',
+        body:`你梦想中的<b>海边庄园</b>正在出售，价格 <b>${fmt(DREAM_COST)} 元</b>。<br>买下它，你就是这场游戏的终极赢家！`,
+        buttons:[
+          { label:'买下梦想！', value:1, primary:true },
+          { label:'再攒攒', value:0 }
+        ]});
+      if (buy){
+        G.cash -= DREAM_COST;
+        return finalWin('买下了梦想庄园');
+      }
+    } else {
+      await showCard({ tag:'快车道 · 梦想', title:'梦想还差一点',
+        body:`海边庄园售价 <b>${fmt(DREAM_COST)} 元</b>，你现有 ${fmt(G.cash)} 元。<br>继续做大买卖、等结算日，梦想越来越近！`,
+        buttons:[{ label:'继续加油', value:0, primary:true }] });
+    }
+  }
+  else if (t === 'tax'){
+    const amt = Math.round(G.cash * 0.1);
+    G.cash -= amt;
+    SFX.play('bad');
+    await showCard({ tag:'快车道 · 税务', title:'税务审计',
+      body:`富人也有烦恼：缴纳所得税 <b>${fmt(amt)} 元</b>（现金的 10%）。`,
+      buttons:[{ label:'乖乖缴税', value:1, primary:true }] });
+    log('🧾 缴税 -' + fmt(amt));
+  }
+  else if (t === 'risk'){
+    if (G.shield){
+      G.shield = false;
+      SFX.play('coin');
+      await showCard({ tag:'快车道 · 风险', title:'商业诉讼？',
+        body:'对方想起诉你，但你在慈善晚宴积累的好名声让对方撤诉了。<b>毫发无损！</b>',
+        buttons:[{ label:'虚惊一场', value:1, primary:true }] });
+      log('🍀 好名声挡下一次诉讼');
+    } else {
+      const amt = Math.max(2000, passive() * 10);
+      G.cash -= amt;
+      SFX.play('bad');
+      await showCard({ tag:'快车道 · 风险', title:'商业诉讼！',
+        body:`竞争对手起诉了你，律师费加和解金 <b>${fmt(amt)} 元</b>。`,
+        buttons:[{ label:'破财免灾', value:1, primary:true }] });
+      log('⚖️ 诉讼 -' + fmt(amt));
+    }
+  }
+  else if (t === 'charity2'){
+    if (G.cash >= 5000){
+      G.cash -= 5000; G.shield = true;
+      SFX.play('coin');
+      await showCard({ tag:'快车道 · 慈善', title:'慈善晚宴',
+        body:'捐赠 <b>5000 元</b>。名流圈的好名声：免除下一次"风险"损失。',
+        buttons:[{ label:'慷慨解囊', value:1, primary:true }] });
+      log('❤️ 慈善捐赠 5000');
+    } else {
+      await showCard({ tag:'快车道 · 慈善', title:'慈善晚宴',
+        body:'现金不足 5000，这次先不捐了。',
+        buttons:[{ label:'下次一定', value:0, primary:true }] });
+    }
+  }
+  // 攒够梦想基金 → 终极胜利
+  if (!G.over && G.cash >= FAST_GOAL) await finalWin('攒够了梦想基金');
+}
+
+async function enterFastTrack(){
+  G.fast = true; G.fpos = 0;
+  SFX.play('win');
+  await showCard({ tag:'🎉 财务自由', title:'跳出老鼠赛跑！',
+    body:`被动收入 <b>${fmt(passive())}/月</b> 已超过总支出！<br>你辞去工作登上<b>快车道</b>：结算日可领被动收入 ×50，攒够 <b>${fmt(FAST_GOAL)}</b> 或在"梦想"格买下梦想庄园，就是终极赢家！`,
+    buttons:[{ label:'冲上快车道 🚀', value:1, primary:true }] });
+  const off = (typeof MP !== 'undefined' && MP.inGame) ? MP.offset(MP.myId) : new THREE.Vector3();
+  const from = piece.position.clone(), to = outPos[0].clone().add(off);
+  await tween(900, k=>{
+    piece.position.lerpVectors(from, to, k);
+    piece.position.y = from.y + (to.y-from.y)*k + Math.sin(k*Math.PI)*4;
+  });
+  if (typeof MP !== 'undefined' && MP.inGame) MP.pos[MP.myId] = 0;
+  updateUI();
+  log('🚀 财务自由！你进入了快车道');
+}
+
+async function finalWin(reason){
+  if (MP.inGame) MP.relay({ t:'win', id:MP.myId, name:MP.myName(), reason });
+  await winGame(MP.myName(), reason);
+}
+
+/* ---------- 7. 回合与胜利 ---------- */
+async function moveRemote(pid, n){   // 联机：移动其他玩家的棋子
+  const m = MP.pieces[pid];
+  if (!m) return;
+  const arr = (MP.rings[pid] || 0) ? outPos : tilePos;
+  let p = MP.pos[pid] || 0;
+  for (let s = 0; s < n; s++){
+    p = (p+1) % 24;
+    SFX.play('hop');
+    const from = m.position.clone(), to = arr[p].clone().add(MP.offset(pid));
+    await tween(240, k=>{
+      m.position.lerpVectors(from, to, k);
+      m.position.y = from.y + (to.y-from.y)*k + Math.sin(k*Math.PI)*0.9;
+    });
+  }
+  MP.pos[pid] = p;
+}
+
+async function takeTurn(){
+  if (G.busy || G.over || !G.mode) return;
+  if (MP.inGame && MP.activeId !== MP.myId) return;   // 没轮到你
+  G.busy = true; $('btnRoll').disabled = true;
+  try {
+    const v = 1 + Math.floor(Math.random()*6);
+    if (MP.inGame) MP.relay({ t:'roll', id:MP.myId, v });   // 先广播，其他人同步动画
+    log('🎲 你掷出了 ' + v + ' 点');
+    turnLog = [];                                           // 之后的日志才会广播
+    await rollDice(v);
+    await moveSteps(v);
+    await resolveTile();
+    updateUI();
+
+    if (!G.fast && passive() >= expenses()){
+      if (MP.inGame) MP.relay({ t:'fast', id:MP.myId, name:MP.myName() });
+      await enterFastTrack();
+    } else if (!G.fast && G.cash < -2000){
+      SFX.play('lose');
+      if (MP.inGame){
+        G.over = true;   // 破产 → 观战
+        await showCard({ tag:'破产', title:'资不抵债……',
+          body:'现金窟窿太大了。你将进入观战模式，看其他玩家谁能笑到最后！',
+          buttons:[{ label:'继续观战', value:1, primary:true }] });
+      } else {
+        G.over = true;
+        await showCard({ tag:'破产', title:'资不抵债……',
+          body:'现金窟窿太大了。记住：先买资产，再买奢侈品。点击重来再挑战一次！',
+          buttons:[{ label:'重新开始', value:1, primary:true }] });
+        location.reload();
+      }
+    }
+
+    if (MP.inGame){
+      MP.relay({ t:'result', id:MP.myId, pos:G.fast ? G.fpos : G.pos, fast:G.fast, logs:turnLog,
+        stmt:{ cash:G.cash, pass:passive(), exp:expenses(), fast:G.fast }, bank:G.over });
+    }
+  } finally {
+    turnLog = null;
+    G.busy = false;
+    updateTurnUI();
+  }
+}
+
+async function winGame(winnerName, reason){
+  G.over = true;
+  SFX.play('win');
+  const isMe = !MP.inGame || winnerName === MP.myName();
+  await showCard({ tag:'🏆 终极赢家', title: isMe ? '人生赢家！' : winnerName + ' 赢了！',
+    body: isMe
+      ? `你<b>${reason || '实现了财务自由'}</b>，成为本局终极赢家！<br>你不再为钱工作，而是让钱为你工作。`
+      : `<b>${winnerName}</b> ${reason || '实现了财务自由'}，成为本局终极赢家！`,
+    buttons:[{ label:'再玩一局', value:1, primary:true }] });
+  location.reload();
+}
+
+/* ---------- 8. 贷款 / 还贷 ---------- */
+$('btnLoan').onclick = async ()=>{
+  if (G.busy || G.over) return;
+  const v = await showCard({ tag:'银行贷款', title:'向银行借钱',
+    body:`每借 <b>1000 元</b>，每月需还款 100 元（计入总支出）。<br>当前贷款：${fmt(G.loans*1000)} 元`,
+    buttons:[
+      { label:'借 1000', value:1000, primary:true }, { label:'借 3000', value:3000 },
+      { label:'借 5000', value:5000 }, { label:'不借了', value:0 }
+    ]});
+  if (v){ G.loans += v/1000; G.cash += v; log('🏦 贷款 +' + fmt(v)); updateUI(); }
+};
+$('btnRepay').onclick = async ()=>{
+  if (G.busy || G.over) return;
+  if (!G.loans) return log('🏦 当前没有贷款');
+  if (G.cash < 1000) return log('🏦 现金不足 1000，无法还款');
+  G.loans--; G.cash -= 1000; log('🏦 还贷 1000'); updateUI();
+};
+$('btnRoll').onclick = ()=>{ SFX.play('click'); takeTurn(); };
+$('btnMute').onclick = ()=>{
+  const m = SFX.toggle();
+  $('btnMute').textContent = m ? '🔇' : '🔊';
+};
+
+/* ---------- 9. 开局 ---------- */
+let chosenMode = null;
+function startGame(mode){
+  SFX.unlock(); SFX.play('click');
+  G.mode = mode;
+  if (mode === 'poor'){
+    Object.assign(G, { salary:3500, baseExp:2600, cash:800 });
+    pieceColor = 0x5b9bff; $('pTitle').textContent = '👔 穷爸爸 · 工薪族';
+  } else {
+    Object.assign(G, { salary:2200, baseExp:1800, cash:2500 });
+    G.assets.push({ kind:'fund', name:'稳利货币基金', cashflow:60, shares:0, buyPrice:0, price:0 });
+    pieceColor = 0xffd166; $('pTitle').textContent = '💼 富爸爸 · 投资者';
+  }
+  piece.userData.recolor(MP.inGame ? MP.colorOf(MP.myId) : pieceColor);
+  if (MP.inGame){
+    piece.position.copy(tilePos[0]).add(MP.offset(MP.myId));
+    MP.pos[MP.myId] = 0;
+    MP.players.forEach(p=>{
+      if (p.id === MP.myId) return;
+      const m = makePiece(p.color);
+      m.position.copy(tilePos[0]).add(MP.offset(p.id));
+      scene.add(m);
+      MP.pieces[p.id] = m; MP.pos[p.id] = 0;
+    });
+    $('mpList').style.display = 'block';
+  }
+  $('startMask').style.display = 'none';
+  $('panel').style.display = 'block';
+  $('controls').style.display = 'flex';
+  $('btnMute').style.display = 'block';
+  updateUI(); updateMpList(); updateTurnUI();
+  log(MP.inGame ? '🎮 联机对局开始！' : '🎮 游戏开始！点击"掷骰子"出发');
+}
+document.querySelectorAll('.roleCard').forEach(b=>{
+  b.onclick = ()=>{
+    SFX.unlock(); SFX.play('click');
+    chosenMode = b.dataset.mode;
+    document.querySelectorAll('.roleCard').forEach(x=> x.style.display = 'none');
+    $('lobby').style.display = 'flex';
+  };
+});
+/* ---------- 10. PWA：注册 Service Worker ---------- */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+</script>
+<script>
+/* ============================================================
+ * 11. WebRTC 多人联机（PeerJS 公共信令，房主权威中继，2-4人）
+ * ============================================================ */
+const ROOM_PREFIX = 'richdad3d-';
+const PALETTE = [0xffd166, 0x5b9bff, 0x5ee08a, 0xff7bb0];
+// 默认用 PeerJS 公共信令云；?signal=local 可切换本地信令（调试用）
+const PEER_CFG = new URLSearchParams(location.search).get('signal') === 'local'
+  ? { host: location.hostname, port: 9000, path: '/' }
+  : {};
+
+const MP = {
+  peer:null, conn:null, conns:[], isHost:false, inGame:false,
+  myId:'', roomCode:'', players:[], order:[], activeId:'',
+  pieces:{}, pos:{}, stmt:{}, dead:{}, rings:{},
+  queue: Promise.resolve(),
+  myName(){ const p = this.players.find(p=> p.id === this.myId); return p ? p.name : '我'; },
+  name(id){ const p = this.players.find(p=> p.id === id); return p ? p.name : '玩家'; },
+  colorOf(id){ const p = this.players.find(p=> p.id === id); return p ? p.color : 0xffd166; },
+  idx(id){ const i = this.order.indexOf(id); return i < 0 ? 0 : i; },
+  offset(id){
+    const i = this.idx(id);
+    return new THREE.Vector3((i%2)*0.7 - 0.35, 0, Math.floor(i/2)*0.7 - 0.35);
+  },
+  enqueue(fn){ this.queue = this.queue.then(fn).catch(()=>{}); },
+  relay(d){                       // 加入者发给房主；房主直接进权威处理
+    if (this.isHost) this.hostOnData(null, d);
+    else if (this.conn && this.conn.open) this.conn.send(d);
+  },
+  broadcast(d, exceptId){
+    this.conns.forEach(c=>{ if (c.open && c.peer !== exceptId) c.send(d); });
+  },
+  hostOnData(conn, d){            // 房主权威入口
+    const from = conn ? conn.peer : this.myId;
+    if (d.t === 'hello'){
+      if (this.inGame){ conn.send({t:'full', msg:'对局已开始'}); return; }
+      if (this.players.length >= 4){ conn.send({t:'full', msg:'房间已满'}); return; }
+      this.players.push({
+        id:from, name:d.name + '·P' + (this.players.length+1),
+        mode:d.mode, color:PALETTE[this.players.length % 4]
+      });
+      this.broadcast({t:'lobby', players:this.players});
+      renderLobby(this.players);
+      return;
+    }
+    if (d.t === 'roll' || d.t === 'result' || d.t === 'win'){
+      this.broadcast(d, from);                       // 中继给其他玩家
+      if (from !== this.myId) this.enqueue(()=> onMpEvent(d));
+      if (d.t === 'result') this.advance(from, d.bank);
+    }
+  },
+  advance(fromId, bank){
+    if (bank) this.dead[fromId] = true;
+    const alive = this.order.filter(id=> !this.dead[id]);
+    if (!alive.length) return;
+    const i = alive.indexOf(this.activeId);
+    this.activeId = alive[(i+1) % alive.length];
+    this.broadcast({t:'turn', id:this.activeId});
+    updateTurnUI();
+  }
+};
+
+async function onMpEvent(d){
+  if (d.t === 'roll'){
+    if (d.id === MP.myId) return;
+    log('🎲 ' + MP.name(d.id) + ' 掷出了 ' + d.v + ' 点');
+    await rollDice(d.v);
+    await moveRemote(d.id, d.v);
+  }
+  else if (d.t === 'result'){
+    if (d.id === MP.myId) return;
+    if ((d.logs || []).length) log('—— ' + MP.name(d.id) + ' 的回合 ——');
+    (d.logs || []).forEach(m=> log(m));
+    MP.stmt[d.id] = d.stmt;
+    if (d.fast) MP.rings[d.id] = 1;
+    if (d.bank){ MP.dead[d.id] = true; log('💀 ' + MP.name(d.id) + ' 破产，进入观战'); }
+    updateMpList();
+  }
+  else if (d.t === 'fast'){   // 有玩家跳出老鼠赛跑
+    if (d.id === MP.myId) return;
+    MP.rings[d.id] = 1; MP.pos[d.id] = 0;
+    SFX.play('win');
+    log('🚀 ' + d.name + ' 财务自由，进入快车道！');
+    const m = MP.pieces[d.id];
+    if (m){
+      const from = m.position.clone(), to = outPos[0].clone().add(MP.offset(d.id));
+      await tween(900, k=>{
+        m.position.lerpVectors(from, to, k);
+        m.position.y = from.y + (to.y-from.y)*k + Math.sin(k*Math.PI)*4;
+      });
+    }
+  }
+  else if (d.t === 'win'){
+    if (d.id !== MP.myId) await winGame(d.name, d.reason);
+  }
+  else if (d.t === 'turn'){
+    MP.activeId = d.id;
+    updateTurnUI();
+  }
+  else if (d.t === 'lobby'){
+    MP.players = d.players;
+    renderLobby(d.players);
+  }
+  else if (d.t === 'start'){
+    beginMpGame(d);
+  }
+  else if (d.t === 'full'){
+    $('lobbyMsg').textContent = d.msg || '无法加入房间';
+  }
+}
+
+/* ---------- 大厅 UI ---------- */
+function renderLobby(players){
+  $('playerList').innerHTML =
+    '已加入（' + players.length + '/4）<br>' +
+    players.map(p=> p.name + (p.id === MP.myId ? '（你）' : '')).join('<br>');
+  if (MP.isHost && !MP.inGame) $('btnMpStart').style.display = 'block';
+}
+
+$('btnSolo').onclick = ()=> startGame(chosenMode);
+
+$('btnCreate').onclick = ()=>{
+  SFX.play('click');
+  MP.isHost = true;
+  $('btnCreate').disabled = true;
+  $('lobbyMsg').textContent = '正在创建房间…';
+  tryHostCode();
+};
+function tryHostCode(){
+  const code = String(Math.floor(1000 + Math.random()*9000));
+  const peer = new Peer(ROOM_PREFIX + code, PEER_CFG);
+  peer.on('open', id=>{
+    MP.peer = peer; MP.myId = id; MP.roomCode = code;
+    MP.players = [{ id, name:(chosenMode === 'rich' ? '💼富爸爸' : '👔穷爸爸') + '·P1',
+                    mode:chosenMode, color:PALETTE[0] }];
+    $('roomCodeShow').textContent = code;
+    $('lobbyMsg').textContent = '把房间号告诉朋友，等待加入（2-4人）';
+    renderLobby(MP.players);
+  });
+  peer.on('connection', conn=>{
+    MP.conns.push(conn);
+    conn.on('data', d=> MP.hostOnData(conn, d));
+    conn.on('close', ()=>{
+      MP.conns = MP.conns.filter(c=> c !== conn);
+      const p = MP.players.find(x=> x.id === conn.peer);
+      MP.players = MP.players.filter(x=> x.id !== conn.peer);
+      if (MP.inGame){
+        MP.dead[conn.peer] = true;
+        log('🚪 ' + (p ? p.name : '玩家') + ' 离开了对局');
+        if (MP.activeId === conn.peer) MP.advance(conn.peer, true);
+      } else {
+        MP.broadcast({t:'lobby', players:MP.players});
+        renderLobby(MP.players);
+      }
+    });
+  });
+  peer.on('disconnected', ()=>{ if (!peer.destroyed) try { peer.reconnect(); } catch(e){} });
+  peer.on('error', e=>{
+    if (e.type === 'unavailable-id'){ peer.destroy(); tryHostCode(); }
+    else $('lobbyMsg').textContent = '网络错误：' + e.type + '，请重试';
+  });
+}
+
+$('btnJoin').onclick = ()=>{
+  SFX.play('click');
+  const code = $('roomInput').value.trim();
+  if (!/^\d{4}$/.test(code)){ $('lobbyMsg').textContent = '请输入 4 位房间号'; return; }
+  $('lobbyMsg').textContent = '正在加入房间 ' + code + ' …';
+  $('btnJoin').disabled = true;
+  const peer = new Peer(PEER_CFG);
+  peer.on('open', id=>{
+    MP.peer = peer; MP.myId = id;
+    const conn = peer.connect(ROOM_PREFIX + code, { reliable:true });
+    MP.conn = conn;
+    conn.on('open', ()=> conn.send({
+      t:'hello', name:(chosenMode === 'rich' ? '💼富爸爸' : '👔穷爸爸'), mode:chosenMode
+    }));
+    conn.on('data', d=> MP.enqueue(()=> onMpEvent(d)));
+    conn.on('close', ()=>{
+      if (!MP.inGame) $('lobbyMsg').textContent = '与房主断开连接';
+      else log('🚪 与房主断开连接');
+    });
+  });
+  peer.on('disconnected', ()=>{ if (!peer.destroyed) try { peer.reconnect(); } catch(e){} });
+  peer.on('error', e=>{
+    $('btnJoin').disabled = false;
+    $('lobbyMsg').textContent = e.type === 'peer-unavailable'
+      ? '房间 ' + code + ' 不存在或已关闭'
+      : '网络错误：' + e.type + '，请重试';
+  });
+};
+
+$('btnMpStart').onclick = ()=>{
+  SFX.play('click');
+  MP.order = MP.players.map(p=> p.id);
+  MP.activeId = MP.order[0];
+  const d = { t:'start', players:MP.players, order:MP.order, active:MP.activeId };
+  MP.broadcast(d);
+  beginMpGame(d);
+};
+function beginMpGame(d){
+  MP.inGame = true;
+  MP.players = d.players; MP.order = d.order; MP.activeId = d.active;
+  startGame(chosenMode);
+}
+
+/* ---------- 回合提示 & 玩家进度 ---------- */
+function updateTurnUI(){
+  const lbl = $('turnLbl');
+  if (!MP.inGame){ lbl.style.display = 'none'; $('btnRoll').disabled = G.busy || G.over; return; }
+  lbl.style.display = 'block';
+  if (G.over){ lbl.textContent = '👀 观战中'; $('btnRoll').disabled = true; return; }
+  const mine = MP.activeId === MP.myId;
+  lbl.textContent = mine ? '🎯 轮到你掷骰了！' : '⏳ 等待 ' + MP.name(MP.activeId) + ' 掷骰…';
+  $('btnRoll').disabled = !mine || G.busy;
+}
+function updateMpList(){
+  if (!MP.inGame) return;
+  $('mpList').innerHTML = MP.players.map(p=>{
+    const s = p.id === MP.myId
+      ? { pass:passive(), exp:expenses(), fast:G.fast }
+      : MP.stmt[p.id];
+    const fast = (p.id === MP.myId) ? G.fast : (MP.rings[p.id] || (s && s.fast));
+    const pct = s ? Math.min(100, Math.round(s.pass / Math.max(1, s.exp) * 100)) : 0;
+    return '<div>' + (p.id === MP.myId ? '👉 ' : '') + p.name +
+      (fast ? ' · 🚀快车道' : ' · 财务自由 ' + pct + '%') + '</div>';
+  }).join('');
+}
+
+// 测试用：?mode=poor / ?mode=rich 跳过选角直接单人开局；&god=1 给测试资金与资产
+const qsMode = new URLSearchParams(location.search).get('mode');
+if (qsMode) startGame(qsMode);
+if (qsMode && new URLSearchParams(location.search).get('god')){
+  G.cash = 120000;
+  G.assets.push({ kind:'biz', name:'测试印钞机', cashflow:3000, shares:0, buyPrice:0, price:0 });
+  updateUI();
+}
+</script>
+</body>
+</html>
