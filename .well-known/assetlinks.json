@@ -3,6 +3,6 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.huanfang.cashflow",
-    "sha256_cert_fingerprints": ["03efa7017b5710eca8e45bd60beedd803eac9f2f545ff58315beacdf821350a4"]
+    "sha256_cert_fingerprints": ["511FB9C0BAF81F605656B6C4064ADD1DAFB2D6354EE389F57976DFCDDF7541D3", "03EFA7017B5710ECA8E45BD60BEEDD803EAC9F2F545FF58315BEACDF821350A4"]
   }
 }]
