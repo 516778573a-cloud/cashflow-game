@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.huanfang.cashflow",
+    "sha256_cert_fingerprints": ["03efa7017b5710eca8e45bd60beedd803eac9f2f545ff58315beacdf821350a4"]
+  }
+}]
